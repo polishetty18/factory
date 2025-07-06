@@ -1,13 +1,14 @@
-# Use a Streamlit release that supports Python 3.13 & newer Pillow
+# Streamlit version that supports Python 3.11 and Plotly
 streamlit==1.28.0
 
 # Core data libraries
 pandas>=2.1.0
 numpy>=1.26.0
 
-# ML & visualization
+# Machine Learning & Visualization
 scikit-learn>=1.3.0
 plotly>=5.17.0
+
 
 
 
