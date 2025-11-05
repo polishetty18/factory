@@ -45,8 +45,8 @@ X = data[features]
 
 # Model
 model = IsolationForest(contamination=contamination, random_state=42)
-data["anomaly"] = model.fit_predict(X)
-data["anomaly"] = data["anomaly"].map({1: "Normal", -1: "Anomaly"})
+data["anomaly_label"] = model.fit_predict(X)
+data["anomaly_label"] = data["anomaly_label"].map({1: "Normal", -1: "Anomaly"})
 
 # Main display
 st.subheader("📉 Real-Time Sensor Readings")
@@ -55,11 +55,12 @@ st.plotly_chart(fig1, use_container_width=True)
 
 # Anomaly visualization
 st.subheader("🚨 Anomaly Detection")
-fig2 = px.scatter(data, x="sensor_1", y="sensor_2", color="anomaly", title="Sensor Anomalies")
+fig2 = px.scatter(data, x="sensor_1", y="sensor_2", color="anomaly_label",
+                  title="Sensor Anomalies", color_discrete_map={'Normal': '#0094b8', 'Anomaly': 'red'})
 st.plotly_chart(fig2, use_container_width=True)
 
 # Insights
-num_anomalies = (data["anomaly"] == "Anomaly").sum()
+num_anomalies = (data["anomaly_label"] == "Anomaly").sum()
 st.metric("⚠️ Detected Anomalies", value=num_anomalies)
 if num_anomalies > 0:
     st.warning("⚠️ Maintenance required. Anomalous behavior detected.")
@@ -73,4 +74,3 @@ with st.expander("🗃 View Raw Sensor Data"):
 # Footer
 st.markdown("---")
 st.markdown("Built with ❤️ using Streamlit | Hackathon Demo")
-
