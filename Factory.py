@@ -68,7 +68,7 @@ else:
 
 # Show raw data (optional)
 with st.expander("🗃 View Raw Sensor Data"):
-    st.dataframe(data.tail(20))
+    st.dataframe(data)
 
 # Footer
 st.markdown("---")
