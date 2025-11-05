@@ -55,8 +55,10 @@ st.plotly_chart(fig1, use_container_width=True)
 
 # Anomaly visualization
 st.subheader("🚨 Anomaly Detection")
+# Modify the color argument in the scatter plot to display anomalies with a distinct color
 fig2 = px.scatter(data, x="sensor_1", y="sensor_2", color="anomaly_label",
-                  title="Sensor Anomalies", color_discrete_map={'Normal': '#0094b8', 'Anomaly': 'red'})
+                  title="Sensor Anomalies",
+                  color_discrete_map={'Normal': 'blue', 'Anomaly': 'red'})
 st.plotly_chart(fig2, use_container_width=True)
 
 # Insights
