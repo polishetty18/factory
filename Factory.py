@@ -97,7 +97,7 @@ if not anom.empty:
         x=anom["sensor_1"], y=anom["sensor_2"],
         mode="markers",
         name="Anomaly",
-        marker=dict(size=16, symbol="diamond", color="red", line=dict(width=1, color="black"))
+        marker=dict(size=16, symbol="diamond", color="red", line=dict(width=1, color="yellow"))
     ))
 
 fig_sc.update_layout(
