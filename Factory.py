@@ -3,139 +3,122 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest
 import plotly.express as px
-import plotly.graph_objects as go
 
 # -------------------------------
-# Simulate sensor data
+# Function to simulate sensor data
 # -------------------------------
 def simulate_sensor_data(n_samples=200):
     timestamps = pd.date_range(end=pd.Timestamp.now(), periods=n_samples, freq="min")
-    sensor_1 = np.random.normal(50, 5, n_samples)
-    sensor_2 = np.random.normal(70, 7, n_samples)
+    # Simulate normal data with small random variations
+    sensor_1 = np.random.normal(loc=50, scale=5, size=n_samples)
+    sensor_2 = np.random.normal(loc=70, scale=7, size=n_samples)
 
-    # Inject visible anomalies
-    anomalies = np.random.choice(n_samples, size=6, replace=False)
-    sensor_1[anomalies] += np.random.normal(40, 10, 6)
-    sensor_2[anomalies] += np.random.normal(55, 12, 6)
+    # Inject anomalies with a larger deviation to make them more obvious
+    anomalies = np.random.choice(n_samples, size=5, replace=False)
+    sensor_1[anomalies] += np.random.normal(30, 5, size=5)
+    sensor_2[anomalies] += np.random.normal(40, 5, size=5)
 
-    return pd.DataFrame({"timestamp": timestamps, "sensor_1": sensor_1, "sensor_2": sensor_2})
+    data = pd.DataFrame({
+        "timestamp": timestamps,
+        "sensor_1": sensor_1,
+        "sensor_2": sensor_2
+    })
+    return data
 
 # -------------------------------
-# App UI
+# Streamlit UI
 # -------------------------------
 st.set_page_config(page_title="Predictive Maintenance Dashboard", layout="wide")
 st.title("🛠️ AI-Powered Predictive Maintenance Dashboard")
-st.markdown("Simulated sensor data with anomaly detection using Isolation Forest.")
+st.markdown("Simulated sensor data with anomaly detection for early failure prediction.")
 
-# Data
+# Load simulated data
 data = simulate_sensor_data()
 
-# Sidebar
+# Sidebar - controls
 st.sidebar.header("⚙️ Configuration")
 contamination = st.sidebar.slider("Anomaly contamination level", 0.01, 0.15, 0.05)
+model_type = st.sidebar.selectbox("Anomaly Detection Model", ["Isolation Forest"])
 
-# -------------------------------
-# Model
-# -------------------------------
+# Preprocess
 features = ["sensor_1", "sensor_2"]
 X = data[features]
 
+# Model
 model = IsolationForest(contamination=contamination, random_state=42)
-labels = model.fit_predict(X)
-data["anomaly_label"] = pd.Series(labels).map({1: "Normal", -1: "Anomaly"})
+data["anomaly_label"] = model.fit_predict(X)
+data["anomaly_label"] = data["anomaly_label"].map({1: "Normal", -1: "Anomaly"})
 
-# -------------------------------
-# Hardening: force numeric + drop bad rows
-# -------------------------------
-for col in ["sensor_1", "sensor_2"]:
-    data[col] = pd.to_numeric(data[col], errors="coerce")
-
-data.replace([np.inf, -np.inf], np.nan, inplace=True)
-data.dropna(subset=["sensor_1", "sensor_2"], inplace=True)
-
-# Split views (still safe if one is empty)
-norm = data[data["anomaly_label"] == "Normal"]
-anom = data[data["anomaly_label"] == "Anomaly"]
-
-# -------------------------------
-# Time series
-# -------------------------------
+# Main display - keep unchanged
 st.subheader("📉 Real-Time Sensor Readings")
-fig_ts = px.line(data, x="timestamp", y=["sensor_1", "sensor_2"], title="Sensor Trends Over Time")
-st.plotly_chart(fig_ts, use_container_width=True)
+fig1 = px.line(data, x="timestamp", y=["sensor_1", "sensor_2"], title="Sensor Trends Over Time")
+st.plotly_chart(fig1, use_container_width=True)
 
 # -------------------------------
-# Scatter with guaranteed visibility
+# Minimal, focused fix for Anomaly visualization
 # -------------------------------
 st.subheader("🚨 Anomaly Detection")
 
-# Compute safe axis ranges
-def padded_range(series, pct=0.2, minimum_pad=10):
-    if series.empty:
-        return [0, 1]
-    span = series.max() - series.min()
-    pad = max(span * pct, minimum_pad)
-    return [series.min() - pad, series.max() + pad]
+# Force numeric types (minimal hardening, doesn't change other app logic)
+data["sensor_1"] = pd.to_numeric(data["sensor_1"], errors="coerce")
+data["sensor_2"] = pd.to_numeric(data["sensor_2"], errors="coerce")
 
-x_range = padded_range(data["sensor_1"])
-y_range = padded_range(data["sensor_2"])
+# Filter anomalies only (we will plot *only* anomaly points as requested)
+anom = data[data["anomaly_label"] == "Anomaly"]
 
-fig_sc = go.Figure()
+# Compute padding and axis ranges from full data so anomalies are in view
+span_x = data["sensor_1"].max() - data["sensor_1"].min()
+span_y = data["sensor_2"].max() - data["sensor_2"].min()
+pad_x = span_x * 0.1 if span_x > 0 else 5
+pad_y = span_y * 0.1 if span_y > 0 else 5
+x_range = [data["sensor_1"].min() - pad_x, data["sensor_1"].max() + pad_x]
+y_range = [data["sensor_2"].min() - pad_y, data["sensor_2"].max() + pad_y]
 
-# Normal points
-if not norm.empty:
-    fig_sc.add_trace(go.Scattergl(
-        x=norm["sensor_1"], y=norm["sensor_2"],
-        mode="markers",
-        name="Normal",
-        marker=dict(size=8, symbol="circle", color="#0094b8", opacity=0.85)
-    ))
-
-# Anomaly points
+# If there are anomalies -> plot them (red diamonds, larger)
 if not anom.empty:
-    fig_sc.add_trace(go.Scattergl(
-        x=anom["sensor_1"], y=anom["sensor_2"],
-        mode="markers",
-        name="Anomaly",
-        marker=dict(size=16, symbol="diamond", color="red", line=dict(width=1, color="yellow"))
-    ))
+    fig2 = px.scatter(
+        anom,
+        x="sensor_1",
+        y="sensor_2",
+        title="Sensor Anomalies (only anomaly points shown)"
+    )
+    # force marker style for anomalies
+    fig2.update_traces(marker=dict(size=14, symbol="diamond", color="red",
+                                   line=dict(width=1, color="black")))
+    # force axis ranges to include anomalies
+    fig2.update_xaxes(range=x_range, title_text="sensor_1", type="linear")
+    fig2.update_yaxes(range=y_range, title_text="sensor_2", type="linear")
+    st.plotly_chart(fig2, use_container_width=True)
+else:
+    # No anomalies detected: show an empty plot with proper numeric axes and a message
+    empty_df = pd.DataFrame({"sensor_1": [data["sensor_1"].min(), data["sensor_1"].max()],
+                             "sensor_2": [data["sensor_2"].min(), data["sensor_2"].max()]})
+    fig2 = px.scatter(
+        empty_df,
+        x="sensor_1",
+        y="sensor_2",
+        title="Sensor Anomalies (no anomalies detected)"
+    )
+    fig2.update_traces(marker=dict(size=0, opacity=0))  # hide the helper points
+    fig2.update_xaxes(range=x_range, title_text="sensor_1", type="linear")
+    fig2.update_yaxes(range=y_range, title_text="sensor_2", type="linear")
+    # add a center annotation so user sees nothing is present
+    fig2.add_annotation(text="No anomalies detected", xref="paper", yref="paper",
+                        x=0.5, y=0.5, showarrow=False, font=dict(size=16, color="gray"))
+    st.plotly_chart(fig2, use_container_width=True)
 
-fig_sc.update_layout(
-    title="Sensor Anomalies",
-    xaxis_title="sensor_1",
-    yaxis_title="sensor_2",
-    legend_title_text="Label"
-)
-
-# Force linear numeric axes and ranges
-fig_sc.update_xaxes(type="linear", range=x_range)
-fig_sc.update_yaxes(type="linear", range=y_range)
-
-st.plotly_chart(fig_sc, use_container_width=True)
-
-# -------------------------------
-# Insights
-# -------------------------------
-st.metric("⚠️ Detected Anomalies", value=len(anom))
-if len(anom) > 0:
+# Insights (unchanged)
+num_anomalies = (data["anomaly_label"] == "Anomaly").sum()
+st.metric("⚠️ Detected Anomalies", value=num_anomalies)
+if num_anomalies > 0:
     st.warning("⚠️ Maintenance required. Anomalous behavior detected.")
 else:
     st.success("✅ All systems operating normally.")
 
-# -------------------------------
-# Debug panel (helpful if chart is empty)
-# -------------------------------
-with st.expander("🧪 Debug panel"):
-    st.write("Dtypes:", data.dtypes)
-    st.write("Head:", data.head())
-    st.write("Describe:", data[["sensor_1", "sensor_2"]].describe())
-    st.write("Counts:", {"norm": len(norm), "anom": len(anom)})
-
-# -------------------------------
-# Raw data
-# -------------------------------
+# Show raw data (optional)
 with st.expander("🗃 View Raw Sensor Data"):
     st.dataframe(data)
 
+# Footer
 st.markdown("---")
-st.markdown("Built with ❤️ using Streamlit | Hardened Plotly rendering")
+st.markdown("Built with ❤️ using Streamlit | Hackathon Demo")
